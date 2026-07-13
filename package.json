@@ -1,0 +1,17 @@
+{
+  "name": "lyrics-cover-helper",
+  "version": "1.0.0",
+  "description": "为“音流”，“箭头音乐”等提供歌词封面",
+  "private": true,
+  "scripts": {
+    "build": "songloft-plugin build",
+    "dev": "songloft-plugin dev",
+    "validate": "songloft-plugin validate",
+    "publish:release": "songloft-plugin publish"
+  },
+  "devDependencies": {
+    "@songloft/plugin-sdk": "^2.9.2",
+    "@songloft/plugin-builder": "^2.9.2",
+    "typescript": "^5.7.0"
+  }
+}

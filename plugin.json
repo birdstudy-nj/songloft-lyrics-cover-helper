@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/songloft-org/plugin-toolchain/main/schemas/plugin.schema.json",
+  "name": "歌词封面助手",
+  "version": "1.0.0",
+  "description": "为“音流”，“箭头音乐”等提供歌词封面",
+  "author": "birdstudy-nj",
+  "homepage": "",
+  "license": "Apache-2.0",
+  "entryPath": "lyrics-cover-helper",
+  "main": "main.js",
+  "minHostVersion": "1.3.0",
+  "permissions": ["storage"],
+  "updateUrl": "",
+  "download_url": "",
+  "entryHash": "",
+  "zipHash": ""
+}
