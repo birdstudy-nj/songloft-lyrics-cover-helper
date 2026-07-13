@@ -1,11 +1,21 @@
 # 歌词封面抓取助手 (Lyrics & Cover Helper)
 
-[![Songloft Plugin](https://img.shields.co/badge/Platform-Songloft-blue?style=flat-square)](https://github.com/birdstudy-nj)
-[![License](https://img.shields.co/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
-基于 **Songloft** 打造的底层音乐元数据刮削插件。本插件专为对音乐品质有极致追求的极客设计，智能聚合了 Apple Music、网易云音乐、Lrc.cx 及 Lrclib 等多路权威数据源，为您打造丝滑、精准、高清的歌词与封面全自动匹配体验。
+基于 **Songloft** 打造的底层音乐元数据刮削插件。智能聚合了 Apple Music、网易云音乐、Lrc.cx 及 Lrclib 等多路权威数据源，为您打造精准、高清的歌词与封面全自动匹配体验。
 
 完美适配主流自建音乐客户端 —— **音流 (Yinliu)** 与 **箭头音乐 (Jiantou Music)**。
+
+👉 **项目主页**：[https://github.com/birdstudy-nj/songloft-lyrics-cover-helper](https://github.com/birdstudy-nj/songloft-lyrics-cover-helper)
+
+---
+
+## 💡 核心优势：极致易用，化繁为简
+
+区别于其他配置繁琐、需要研究各种 API 参数的同类刮削插件，本插件将**“易用性”**做到了极致：
+
+1. **面向 App 深度定制的界面**：控制台中的「音流」和「箭头音乐」标签页，**完全剥离了技术黑话**，完全按照对应手机 App 设置界面里**实际需要你填写的字段**进行排版展示。App 问什么，界面就提供什么。
+2. **傻瓜式一键复制**：每个配置项（如服务地址、验证 token 等）右侧均内置了高效的**“复制”**按钮。你不需要手动去框选、不用担心多复制了空格，只需轻松点一下，直接去手机 App 里粘贴，即可秒速完成全部配置！
+3. **所见即所得的接口测试**：无需借助 Postman 等专业调试工具，界面自带测试面板，直接输入歌名歌手就能在手机或电脑上看到真实的获取结果，新手也能无痛上手。
 
 ---
 
@@ -22,8 +32,8 @@
   * 整合 **Lrclib 终极搜索**，确保冷门与独立音乐依然拥有高品质同步双语/滚动歌词。
 
 * 📡 **可视化监控控制台 (Debug Panel)**
-  * 提供优雅的 Web 控制台界面，直观管理接口配置与一键复制 Token 信息。
-  * 实时监控外部 App 请求，滚动保留**最近 10 条**核心接入日志，包含请求时间、完整 URL 请求参数以及完整的后端实际返回值（支持长文本自动截断展示）。
+  * 实时监控外部 App 请求，滚动保留**最近 10 条**核心接入日志。
+  * 包含请求时间、完整 URL 请求参数以及完整的后端实际返回值（支持长文本自动截断展示，表格空间充足，方便排查）。
   * 针对小屏幕/手机端提供**深度响应式布局优化**，操作按钮在移动端平分宽度，方便单手调试。
 
 * 🍏 **iPhone 端专项兼容优化**
@@ -32,23 +42,30 @@
 
 ---
 
-## 🚀 客户端配置指南
+## 🚀 客户端配置指南（复制即用）
 
-成功在 Songloft 部署本插件后，进入管理面板获取你的专属接口：
+成功在 Songloft 部署本插件后，进入管理面板，动动手指“点按复制 ➔ 手机粘贴”即可：
 
 ### 1. 音流 (Yinliu) 配置
-* **路径**：`设置` ➔ `自定义API`
-* **配置项**：
-  * **验证信息 (Authorization)**：直接复制面板生成的 `Bearer <Your_Token>`
-  * **歌词接口**：`http://<Your_Server>:<Port>/api/v1/jsplugin/lyrics-cover-helper/api/yinliu/lyric`
-  * **封面接口**：`http://<Your_Server>:<Port>/api/v1/jsplugin/lyrics-cover-helper/api/yinliu/cover` *(返回 301/302 重定向)*
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8d2a28cc-8133-4725-9adf-66694fd44b2a" width="320" alt="音流配置">
+</p>
 
 ### 2. 箭头音乐 (Jiantou Music) 配置
-* **路径**：`设置` ➔ `歌词` ➔ `歌词接口` ➔ `右上角添加`
-* **配置项**：
-  * **服务名称**：歌词封面助手
-  * **服务地址**：`http://<Your_Server>:<Port>/api/v1/jsplugin/lyrics-cover-helper/api/jiantou/lyric?title={title}&artist={artist}`
-  * **认证信息**：`Authorization: Bearer <Your_Token>`
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/b5cc4ce9-4517-4ef3-a953-ec41653e6890" width="320" alt="箭头音乐配置">
+</p>
 
 ---
 
+## 🧑‍💻 关于作者
+* GitHub: @birdstudy-nj
+
+* 项目主页: songloft-lyrics-cover-helper
+
+如果您觉得这个插件让您的自建音乐配置变得前所未有的简单，或者改善了您的听歌体验，欢迎前往项目主页点一个 ⭐ Star，您的支持是我持续优化和维护的动力！
+
+---
+
+## 📄 开源协议
+本项目基于 MIT License 协议开源。
