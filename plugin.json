@@ -10,8 +10,8 @@
   "main": "main.js",
   "minHostVersion": "1.3.0",
   "permissions": ["storage"],
-  "updateUrl": "",
-  "download_url": "",
+  "updateUrl": "https://raw.githubusercontent.com/birdstudy-nj/songloft-lyrics-cover-helper/main/plugin.json",
+  "download_url": "https://github.com/birdstudy-nj/songloft-lyrics-cover-helper/releases/download/v1.0.0/lyrics-cover-helper.jsplugin.zip",
   "entryHash": "",
   "zipHash": ""
 }
