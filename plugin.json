@@ -6,6 +6,7 @@
   "author": "birdstudy-nj",
   "homepage": "",
   "license": "Apache-2.0",
+  "icon": "icon.svg",
   "entryPath": "lyrics-cover-helper",
   "main": "main.js",
   "minHostVersion": "1.3.0",
