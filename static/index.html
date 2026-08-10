@@ -319,8 +319,24 @@
         }).catch(() => fallbackCopyTextToClipboard(text, btnElement));
     }
 
-    function initConfig() {
-        const token = getSafeToken();
+    async function initConfig() {
+        let token = getSafeToken();
+
+        // 🌟 优先向后端获取插件专属的系统级长效 Token
+        try {
+            const res = await fetch(`${PLUGIN_BASE}/api/token`, {
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.token) {
+                    token = data.token;
+                }
+            }
+        } catch(e) {
+            console.warn("读取系统级 Token 失败，回退到用户本地 Token", e);
+        }
+
         const placeholderToken = token ? token : "未检测到本地Token";
 
         document.getElementById('token-yinliu').value = token ? `Bearer ${token}` : placeholderToken;
@@ -329,7 +345,6 @@
 
         document.getElementById('token-jiantou').value = token ? `Authorization: Bearer ${token}` : placeholderToken;
         document.getElementById('url-jiantou-lyric').value = `${PLUGIN_BASE}/api/jiantou/lyric?title={title}&artist={artist}`;
-        // 箭头封面相关已移除
     }
 
     // --- Tab 切换与自动刷新控制 ---
