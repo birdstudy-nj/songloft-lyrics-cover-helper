@@ -4,6 +4,19 @@ import { jsonResponse, createRouter } from '@songloft/plugin-sdk';
 const router = createRouter();
 const requestLogs: any[] = [];
 
+// 🌟 保活计时器句柄
+let keepAliveTimer: any = null;
+
+// 🌟 向前端暴露系统级插件 Token
+router.get('/api/token', async () => {
+    try {
+        const token = await songloft.plugin.getToken();
+        return jsonResponse({ token });
+    } catch (e) {
+        return jsonResponse({ token: "" }, 500);
+    }
+});
+
 // ==========================================
 // 🛡️ 防火墙伪装与请求头配置
 // ==========================================
@@ -31,10 +44,8 @@ function getQueryParams(req: HTTPRequest): Record<string, string> {
     return query;
 }
 
-// 🌟 修改点 1：增加 IP 解析，并返回日志对象的引用，方便后续补全状态码
 function logIncomingRequest(req: HTTPRequest) {
     const headers = req.headers || {};
-    // 尝试获取 IP，如果宿主环境没传，则只能是未知
     const clientIp = (req as any).clientIP || (req as any).ip || headers['x-forwarded-for'] || headers['X-Forwarded-For'] || headers['x-real-ip'] || "未知";
 
     const logEntry = {
@@ -44,11 +55,10 @@ function logIncomingRequest(req: HTTPRequest) {
         query: getQueryParams(req),
         headers: headers,
         ip: clientIp,
-        responseValue: "-" // 🌟 用来存具体返回给访问者的值
+        responseValue: "-"
     };
 
     requestLogs.unshift(logEntry);
-    // 🌟 修改：只保留最近 10 条
     if (requestLogs.length > 10) requestLogs.pop();
 
     return logEntry;
@@ -311,15 +321,46 @@ router.get('/api/jiantou/lyric', async (req) => {
     };
 });
 
+// ==========================================
+// ⏰ 后台定时保活机制（每 1 天自动打卡）
+// ==========================================
+function startKeepAlive() {
+    if (keepAliveTimer) clearInterval(keepAliveTimer);
+
+    // 设置为每 1 天执行一次 (24小时 = 24 * 60 * 60 * 1000 毫秒)
+    keepAliveTimer = setInterval(async () => {
+        try {
+            // 1. 获取系统级 Token 触发宿主内部续期
+            const token = await songloft.plugin.getToken();
+
+            // 2. 写入一次轻量时间戳，保持存储引擎和 Actor 激活
+            if (token) {
+                await songloft.storage.set('last_keep_alive', new Date().toISOString());
+                songloft.log.info('[保活机制] 插件每日定时保活成功，系统 Token 状态正常');
+            }
+        } catch (e) {
+            songloft.log.warn('[保活机制] 插件每日定时保活触发异常: ' + e);
+        }
+    }, 24 * 60 * 60 * 1000);
+}
+
 async function onInit(): Promise<void> {
     songloft.log.info('lyrics-cover-helper initialized');
+
+    // 🌟 插件初始化时启动每天一次的后台保活
+    startKeepAlive();
 }
 
 async function onDeinit(): Promise<void> {
     songloft.log.info('lyrics-cover-helper deinitialized');
+
+    // 🌟 插件卸载/重载时清理计时器
+    if (keepAliveTimer) {
+        clearInterval(keepAliveTimer);
+        keepAliveTimer = null;
+    }
 }
 
-// 🌟 修改点 2：在路由处理完毕后，捕获结果并将状态码写回到对应的日志记录中
 async function onHTTPRequest(req: HTTPRequest): Promise<HTTPResponse> {
     let logEntry = null;
 
@@ -329,21 +370,17 @@ async function onHTTPRequest(req: HTTPRequest): Promise<HTTPResponse> {
 
     const response = await router.handle(req);
 
-    // 🌟 核心修改：在路由处理完毕后，抓取具体的返回值存入日志
     if (logEntry && response) {
         if (response.statusCode === 302 || response.statusCode === 301) {
-            // 如果是封面跳转，记录跳转的最终 URL
             const loc = (response.headers as any)?.Location || (response.headers as any)?.location;
             logEntry.responseValue = `[封面跳转] ${loc}`;
         } else {
-            // 如果是歌词，提取文本或 JSON
             let bodyStr = "";
             if (typeof response.body === 'object') {
                 bodyStr = JSON.stringify(response.body);
             } else {
                 bodyStr = String(response.body || "");
             }
-            // 截断太长的数据，防止调试表格被长篇歌词撑爆
             logEntry.responseValue = bodyStr.length > 120 ? bodyStr.substring(0, 120) + "..." : (bodyStr || "无返回值");
         }
     }
