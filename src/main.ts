@@ -298,7 +298,16 @@ router.get('/api/jiantou/cover', async (req) => {
     const album = q.album || "";
 
     const coverUrl = await fetchCover(title, artist, album);
-    return jsonResponse({ cover: coverUrl || "" });
+
+    if (coverUrl) {
+        return {
+            statusCode: 302,
+            headers: { 'Location': coverUrl },
+            body: ''
+        };
+    }
+
+    return { statusCode: 404, headers: {}, body: 'Not Found' };
 });
 
 router.get('/api/jiantou/lyric', async (req) => {
