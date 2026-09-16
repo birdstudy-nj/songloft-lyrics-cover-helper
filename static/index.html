@@ -41,7 +41,7 @@
         /* 4. Cards */
         .lch-card { border: 1px solid var(--lch-border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
         .lch-card-title { font-size: 1.05rem; font-weight: bold; margin-top: 0; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--lch-text); }
-        .lch-hint-text { font-size: 13px; color: #6b7280; margin-top: 0; margin-bottom: 16px; line-height: 1.5; background: #f3f4f6; padding: 8px 12px; border-radius: 6px; border-left: 4px solid var(--lch-primary); }
+        .lch-hint-text { font-size: 13px; color: #6b7280; margin-top: 0; margin-bottom: 12px; line-height: 1.5; background: #f3f4f6; padding: 8px 12px; border-radius: 6px; border-left: 4px solid var(--lch-primary); }
 
         /* 5. Inputs */
         .lch-input-group { margin-bottom: 16px; }
@@ -74,24 +74,23 @@
         .lch-table th { background: #f9fafb; font-weight: 600; color: #4b5563; }
         .url-cell { word-break: break-all; color: var(--lch-primary); font-family: monospace; font-weight: 500; line-height: 1.4; }
 
-        /* 🌟 Debug 头部布局（提取类名，方便响应式控制） */
+        /* Debug 头部布局 */
         .lch-debug-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .lch-debug-actions { display: flex; gap: 8px; }
 
-        /* 🌟 移动端响应式优化 */
+        /* 移动端响应式优化 */
         @media (max-width: 600px) {
             .lch-wrapper { padding: 12px 10px; }
             .lch-container { padding: 16px; }
             .lch-test-grid { grid-template-columns: 1fr; }
 
-            /* Debug 页面按钮小屏幕优化：标题独占一行，下方按钮平分宽度 */
             .lch-debug-header {
                 flex-direction: column;
-                align-items: stretch; /* 占满宽度 */
-                gap: 12px; /* 上下间距 */
+                align-items: stretch;
+                gap: 12px;
             }
             .lch-debug-actions button {
-                flex: 1; /* 两个按钮平分 100% 宽度 */
+                flex: 1;
                 text-align: center;
                 justify-content: center;
             }
@@ -173,15 +172,9 @@
         <div id="tab-jiantou" class="lch-tab-pane">
             <div class="lch-card">
                 <h3 class="lch-card-title">🔗 客户端配置</h3>
-                <p class="lch-hint-text">💡 <b>配置路径：</b>设置 —— 歌词 —— 歌词接口 —— 右上角添加 —— 填入服务名称（比如：歌词封面助手），对应复制服务地址、认证信息</p>
+                <p class="lch-hint-text" style="margin-bottom: 8px;">💡 <b>歌词配置路径：</b>设置 —— 实验室 —— 第三方接口 —— 歌词接口 —— 右上角添加 —— 填入服务名称（比如：歌词封面助手），对应复制服务地址、认证信息 —— 完成后，建议把新建接口排在内嵌歌词下面</p>
+                <p class="lch-hint-text" style="margin-bottom: 16px;">💡 <b>封面配置路径：</b>设置 —— 实验室 —— 第三方接口 —— 封面接口 —— 右上角添加 —— 填入服务名称（比如：歌词封面助手），对应复制服务地址、认证信息 —— 完成后，建议把新建接口排在箭头封面上面</p>
 
-                <div class="lch-input-group">
-                    <label>服务地址</label>
-                    <div class="lch-input-row">
-                        <input type="text" id="url-jiantou-lyric" readonly>
-                        <button class="lch-btn lch-btn-copy" onclick="copyText('url-jiantou-lyric', this)">复制</button>
-                    </div>
-                </div>
                 <div class="lch-input-group">
                     <label>认证信息</label>
                     <div class="lch-input-row">
@@ -189,7 +182,21 @@
                         <button class="lch-btn lch-btn-copy" onclick="copyText('token-jiantou', this)">复制</button>
                     </div>
                 </div>
+                <div class="lch-input-group">
+                    <label>歌词服务地址</label>
+                    <div class="lch-input-row">
+                        <input type="text" id="url-jiantou-lyric" readonly>
+                        <button class="lch-btn lch-btn-copy" onclick="copyText('url-jiantou-lyric', this)">复制</button>
+                    </div>
                 </div>
+                <div class="lch-input-group">
+                    <label>封面服务地址</label>
+                    <div class="lch-input-row">
+                        <input type="text" id="url-jiantou-cover" readonly>
+                        <button class="lch-btn lch-btn-copy" onclick="copyText('url-jiantou-cover', this)">复制</button>
+                    </div>
+                </div>
+            </div>
 
             <div class="lch-test-section">
                 <h3 class="lch-card-title" style="font-size: 1rem; margin-bottom: 12px;">🧪 接口测试 (箭头音乐格式)</h3>
@@ -202,10 +209,15 @@
                         <label>歌手 (artist)</label>
                         <div class="lch-input-row"><input type="text" id="jt-artist" value="周杰伦"></div>
                     </div>
+                    <div class="lch-input-group" style="grid-column: 1 / -1;">
+                        <label>专辑 (album)</label>
+                        <div class="lch-input-row"><input type="text" id="jt-album" value="七里香"></div>
                     </div>
+                </div>
                 <div class="lch-test-actions">
                     <button class="lch-btn lch-btn-action" onclick="runTest('jiantou', 'lyric', 'jt')">测试获取歌词</button>
-                    </div>
+                    <button class="lch-btn lch-btn-action" style="background: #10b981;" onclick="runTest('jiantou', 'cover', 'jt')">测试获取封面</button>
+                </div>
                 <pre id="jt-result">等待测试...</pre>
             </div>
         </div>
@@ -238,7 +250,10 @@
             <div class="lch-card" style="text-align: center; padding: 40px 20px;">
                 <img src="static/icon.db88ca8d.svg" alt="Logo" style="height: 72px; width: 72px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
 
-                <h2 style="margin: 0 0 12px 0; color: #111827; font-size: 1.25rem;">歌词封面抓取助手</h2>
+                <h2 style="margin: 0 0 12px 0; color: #111827; font-size: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    歌词封面抓取助手
+                    <span style="font-size: 0.75rem; background: #eff6ff; color: var(--lch-primary); padding: 2px 8px; border-radius: 12px; font-weight: 600; border: 1px solid #bfdbfe;">v1.1.0</span>
+                </h2>
 
                 <p style="font-size: 0.875rem; color: #6b7280; line-height: 1.6; max-width: 500px; margin: 0 auto 24px auto;">
                     基于 <b>Songloft</b> 打造的底层元数据刮削插件。<br>
@@ -246,7 +261,7 @@
                 </p>
 
                 <div style="display: flex; justify-content: center; gap: 12px;">
-                    <a href="https://github.com/birdstudy-nj" target="_blank" class="lch-btn lch-btn-action" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: #24292e;">
+                    <a href="https://github.com/birdstudy-nj/songloft-lyrics-cover-helper" target="_blank" class="lch-btn lch-btn-action" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: #24292e;">
                         <svg height="18" width="18" viewBox="0 0 16 16" fill="white"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
                         访问我的 GitHub
                     </a>
@@ -319,10 +334,40 @@
         }).catch(() => fallbackCopyTextToClipboard(text, btnElement));
     }
 
+    // 🌟 前端检查与配置常驻白名单 (plugin-keep-alive)
+    async function ensureKeepAliveSetting(token) {
+        try {
+            const cleanToken = token.replace(/^Bearer\s+/i, '');
+            const endpoint = `${BASE_URL}/api/v1/settings/plugin-keep-alive`;
+            const headers = {
+                'Authorization': `Bearer ${cleanToken}`,
+                'Content-Type': 'application/json'
+            };
+
+            const res = await fetch(endpoint, { method: 'GET', headers });
+            if (!res.ok) return;
+
+            const data = await res.json();
+            let plugins = (data && Array.isArray(data.plugins)) ? data.plugins : [];
+            const MY_ENTRY_PATH = 'lyrics-cover-helper';
+
+            if (!plugins.includes(MY_ENTRY_PATH)) {
+                plugins.push(MY_ENTRY_PATH);
+                await fetch(endpoint, {
+                    method: 'PUT',
+                    headers: headers,
+                    body: JSON.stringify({ plugins })
+                });
+                console.log(`[常驻白名单] 前端已自动将 ${MY_ENTRY_PATH} 注册至系统的 plugin-keep-alive 配置中`);
+            }
+        } catch (e) {
+            console.warn('[常驻白名单] 检查常驻设置失败:', e);
+        }
+    }
+
     async function initConfig() {
         let token = getSafeToken();
 
-        // 🌟 优先向后端获取插件专属的系统级长效 Token
         try {
             const res = await fetch(`${PLUGIN_BASE}/api/token`, {
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
@@ -337,14 +382,22 @@
             console.warn("读取系统级 Token 失败，回退到用户本地 Token", e);
         }
 
+        // 🌟 首次打开网页时，自动触发注册常驻白名单
+        if (token) {
+            ensureKeepAliveSetting(token);
+        }
+
         const placeholderToken = token ? token : "未检测到本地Token";
 
+        // 音流配置
         document.getElementById('token-yinliu').value = token ? `Bearer ${token}` : placeholderToken;
         document.getElementById('url-yinliu-lyric').value = `${PLUGIN_BASE}/api/yinliu/lyric`;
         document.getElementById('url-yinliu-cover').value = `${PLUGIN_BASE}/api/yinliu/cover`;
 
+        // 箭头音乐配置
         document.getElementById('token-jiantou').value = token ? `Authorization: Bearer ${token}` : placeholderToken;
         document.getElementById('url-jiantou-lyric').value = `${PLUGIN_BASE}/api/jiantou/lyric?title={title}&artist={artist}`;
+        document.getElementById('url-jiantou-cover').value = `${PLUGIN_BASE}/api/jiantou/cover?t&title={title}&artist={artist}&album={album}`;
     }
 
     // --- Tab 切换与自动刷新控制 ---
@@ -385,7 +438,7 @@
         }
     }
 
-    // 🌟 升级：通过回马枪调用 debug 日志接口，优雅解决 iPhone 上 Fetch 302 重定向导致的 CORS 拦截问题
+    // 接口测试逻辑（通用处理音流与箭头音乐）
     async function runTest(app, type, prefix) {
         const out = document.getElementById(`${prefix}-result`);
         out.textContent = "请求发送中，请稍候...";
@@ -404,7 +457,8 @@
                 headers: rawToken ? { 'Authorization': `Bearer ${rawToken}` } : {}
             });
 
-            if (app === 'yinliu' && type === 'cover') {
+            // 统一处理音流与箭头音乐的封面跳转
+            if (type === 'cover') {
                 out.textContent = `[HTTP 状态码: ${res.status}]\n是否发生跳转: ${res.redirected ? '是' : '否'}\n最终获取的图片地址: ${res.url}`;
                 return;
             }
@@ -418,13 +472,11 @@
             const data = await res.json();
             out.textContent = `[HTTP 状态码: ${res.status}]\n${JSON.stringify(data, null, 2)}`;
         } catch(e) {
-            // 🌟 核心拦截逻辑：针对音流封面的特殊处理
-            if (app === 'yinliu' && type === 'cover') {
+            // 封面跳转遇跨域拦截的回马枪逻辑
+            if (type === 'cover') {
                 try {
-                    // 微调等待 80ms 确保后端已经把完成的日志塞进数组
                     await new Promise(r => setTimeout(r, 80));
 
-                    // 去请求我们绝不会被跨域拦截的 debug 日志接口
                     const logRes = await fetch(`${PLUGIN_BASE}/api/debug/logs`, {
                         headers: rawToken ? { 'Authorization': `Bearer ${rawToken}` } : {}
                     });
@@ -434,7 +486,6 @@
                         const latestLog = logs[0];
                         const resValue = latestLog.responseValue || "";
 
-                        // 从后端的存盘日志中，直接提取 [封面跳转] 后面的图片 URL 文本
                         if (resValue.includes('[封面跳转]')) {
                             const realUrl = resValue.replace('[封面跳转] ', '');
                             out.textContent = `[HTTP 状态码: 200 (iPhone 兼容模式)]\n是否发生跳转: 是\n最终获取的图片地址: ${realUrl}`;
@@ -446,7 +497,6 @@
                 }
             }
 
-            // 其它普通接口发生网络异常的兜底
             out.textContent = `请求出错或网络异常: ${e.message}`;
         }
     }
