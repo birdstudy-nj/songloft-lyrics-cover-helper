@@ -3,19 +3,48 @@ import { jsonResponse, createRouter } from '@songloft/plugin-sdk';
 
 const router = createRouter();
 const requestLogs: any[] = [];
-
-// 🌟 保活计时器句柄
 let keepAliveTimer: any = null;
 
-// 🌟 向前端暴露系统级插件 Token
-router.get('/api/token', async () => {
+// ==========================================
+// ⚙️ 默认歌词源配置 (Songloft 居中)
+// ==========================================
+interface LyricSourceItem {
+    id: 'karaoke' | 'songloft' | 'builtin';
+    name: string;
+    desc: string;
+    enabled: boolean;
+}
+
+const DEFAULT_SOURCES: LyricSourceItem[] = [
+    { id: 'karaoke', name: '逐字歌词插件 (karaoke-lyric)', desc: '优先返回逐字时间轴 (lxlyric)，无逐字时回退普通歌词', enabled: true },
+    { id: 'songloft', name: 'Songloft 本地曲库歌词', desc: '检索宿主已有歌曲库并直接提取歌词', enabled: true },
+    { id: 'builtin', name: '自带网络刮削 (lrc.cx / lrclib)', desc: '聚合多平台刮削并智能校验评分', enabled: true }
+];
+
+async function getStoredSources(): Promise<LyricSourceItem[]> {
     try {
+        const cfg = await songloft.storage.get('lyric_sources');
+        if (cfg && Array.isArray(cfg)) return cfg;
+    } catch (e) {}
+    return DEFAULT_SOURCES;
+}
+
+// 探测 karaoke-lyric 逐字歌词插件是否在线
+async function checkKaraokePluginAlive(): Promise<boolean> {
+    try {
+        const hostUrl = await songloft.plugin.getHostUrl();
         const token = await songloft.plugin.getToken();
-        return jsonResponse({ token });
+        const res: any = await Promise.race([
+            fetch(`${hostUrl}/api/v1/jsplugin/karaoke-lyric/info`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1500))
+        ]);
+        return !!(res && res.ok);
     } catch (e) {
-        return jsonResponse({ token: "" }, 500);
+        return false;
     }
-});
+}
 
 // ==========================================
 // 🛡️ 防火墙伪装与请求头配置
@@ -25,15 +54,10 @@ const COMMON_HEADERS = {
     "Accept": "application/json, text/plain, */*"
 };
 
-// ==========================================
-// 🛡️ 参数强制解析器 (解决 query 字符串化问题)
-// ==========================================
 function getQueryParams(req: HTTPRequest): Record<string, string> {
     const query: Record<string, string> = {};
     if (!req.query) return query;
-
     if (typeof req.query === 'object') return req.query as Record<string, string>;
-
     if (typeof req.query === 'string') {
         const pairs = req.query.split('&');
         for (const pair of pairs) {
@@ -60,21 +84,30 @@ function logIncomingRequest(req: HTTPRequest) {
 
     requestLogs.unshift(logEntry);
     if (requestLogs.length > 10) requestLogs.pop();
-
     return logEntry;
 }
 
 // ==========================================
-// 🎵 核心工具函数
+// 🎵 核心过滤与文本工具函数
 // ==========================================
+function cleanArtist(artist: string): string {
+    if (!artist) return "";
+    const s = artist.trim().toLowerCase();
+    if (s === "未知歌手" || s === "未知" || s === "unknown artist" || s === "unknown") {
+        return "";
+    }
+    return artist;
+}
+
 function cleanStr(str: string): string {
     if (!str) return "";
     return String(str).replace(/\.[^/.]+$/, "").replace(/[\(（].*?[\)）]/g, '').replace(/\s+/g, '').toLowerCase().trim();
 }
 
 function parseArtists(str: string): string[] {
-    if (!str) return [];
-    return str.split(/&|、|,|，|\/|\||和|与|feat\.|ft\./i).map(a => a.replace(/\s+/g, '').toLowerCase().trim()).filter(a => a);
+    const validArtist = cleanArtist(str);
+    if (!validArtist) return [];
+    return validArtist.split(/&|、|,|，|\/|\||和|与|feat\.|ft\./i).map(a => a.replace(/\s+/g, '').toLowerCase().trim()).filter(a => a);
 }
 
 function isArtistMatch(localArtists: string[], apiArtists: string[]): boolean {
@@ -95,9 +128,10 @@ async function fetchWithTimeout(url: string, timeoutMs = 3000): Promise<any> {
 }
 
 // ==========================================
-// 🖼️ 封面刮削 (优先 Apple -> 兜底网易云)
+// 🖼️ 封面刮削 (优先 Apple -> 兜底网易云走宿主原生代理)
 // ==========================================
 async function fetchCover(title: string, artist: string, album: string): Promise<string | null> {
+    artist = cleanArtist(artist);
     const searchTerm = `${title || ''} ${artist || ''} ${album || ''}`.trim();
     if (!searchTerm) return null;
 
@@ -126,7 +160,8 @@ async function fetchCover(title: string, artist: string, album: string): Promise
             if (neData && neData.result && neData.result.songs && neData.result.songs.length > 0) {
                 const al = neData.result.songs[0].al;
                 if (al && al.picUrl) {
-                    return al.picUrl + "?param=600y600";
+                    const token = await songloft.plugin.getToken();
+                    return `/api/v1/proxy?url=${encodeURIComponent(al.picUrl)}&access_token=${token}`;
                 }
             }
         }
@@ -136,26 +171,122 @@ async function fetchCover(title: string, artist: string, album: string): Promise
 }
 
 // ==========================================
-// 🎤 lrc.cx 评分刮削引擎
+// 🎤 歌词渠道 1: 逐字歌词插件 (karaoke-lyric)
+// ==========================================
+async function fetchFromKaraokePlugin(title: string, artist: string, allowVerbatim = true): Promise<string | null> {
+    try {
+        const hostUrl = await songloft.plugin.getHostUrl();
+        const token = await songloft.plugin.getToken();
+        const url = `${hostUrl}/api/v1/jsplugin/karaoke-lyric/open-scrape`;
+
+        const res: any = await Promise.race([
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    title: title,
+                    artist: artist,
+                    lyrics_type: allowVerbatim ? 'verbatim' : 'line'
+                })
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 4000))
+        ]);
+
+        if (res && res.ok) {
+            const data = await res.json();
+            if (data && data.success) {
+                // 🌟 1. 允许逐字歌词（如箭头音乐）：优先返回逐字时间轴
+                if (allowVerbatim && data.lxlyric && typeof data.lxlyric === 'string' && data.lxlyric.trim().length > 0) {
+                    return data.lxlyric.trim();
+                }
+
+                // 🌟 2. 不支持逐字歌词（如音流）或无逐字时间轴：返回普通逐行 lyric
+                if (data.lyric && typeof data.lyric === 'string' && data.lyric.trim().length > 0) {
+                    return data.lyric.trim();
+                }
+
+                // 3. 兜底保护：若只收到了逐字时间轴且客户端不支持逐字，剥除内嵌时间戳转为普通逐行歌词
+                if (!allowVerbatim && data.lxlyric && typeof data.lxlyric === 'string') {
+                    return data.lxlyric.replace(/\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]/g, (match: string, offset: number, fullStr: string) => {
+                        return (offset === 0 || fullStr[offset - 1] === '\n') ? match : '';
+                    }).trim();
+                }
+            }
+        }
+    } catch (e) {}
+    return null;
+}
+
+// ==========================================
+// 🎤 歌词渠道 2: Songloft 本地曲库搜索
+// ==========================================
+async function fetchFromSongloftLocal(title: string, artist: string): Promise<string | null> {
+    try {
+        const hostUrl = await songloft.plugin.getHostUrl();
+        const token = await songloft.plugin.getToken();
+        if (!hostUrl || !token) return null;
+
+        const searchUrl = `${hostUrl}/api/v1/songs?keyword=${encodeURIComponent(title)}&limit=10`;
+        const res: any = await Promise.race([
+            fetch(searchUrl, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
+        ]);
+
+        if (!res || !res.ok) return null;
+
+        const data: any = await res.json();
+        const list: any[] = Array.isArray(data) ? data : (data.items || data.songs || data.data || []);
+        if (!list || list.length === 0) return null;
+
+        let target = list[0];
+        if (artist) {
+            const cleanA = cleanStr(artist);
+            const match = list.find((s: any) => cleanStr(s.artist || '').includes(cleanA));
+            if (match) target = match;
+        }
+
+        if (target.lyric && typeof target.lyric === 'string' && target.lyric.trim().length > 0) {
+            return target.lyric.trim();
+        }
+
+        if (target.id) {
+            const lyricRes = await fetch(`${hostUrl}/api/v1/songs/${target.id}/lyric`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (lyricRes.ok) {
+                const lData: any = await lyricRes.json();
+                const lrc = lData.lyric || lData.lyrics;
+                if (lrc && typeof lrc === 'string' && lrc.trim().length > 0) {
+                    return lrc.trim();
+                }
+            }
+        }
+    } catch (e) {}
+    return null;
+}
+
+// ==========================================
+// 🎤 歌词渠道 3: 自带网络刮削引擎 (lrc.cx / lrclib)
 // ==========================================
 async function fetchFromLrcCx(title: string, artist: string): Promise<string | null> {
     if (!title) return null;
-
     const url = `https://api.lrc.cx/jsonapi?title=${encodeURIComponent(title)}` + (artist ? `&artist=${encodeURIComponent(artist)}` : "");
     const res = await fetchWithTimeout(url);
-
     if (!res || !res.ok) return null;
 
     let data: any;
     try { data = await res.json(); } catch(e) { return null; }
 
     let bestLrc: string | null = null;
-
     if (Array.isArray(data) && data.length > 0) {
         const cLocalTitle = cleanStr(title);
         const localArtists = parseArtists(artist);
         const rawLocalTitle = title.toLowerCase().replace(/\s+/g, '');
-
         let highestScore = -999;
 
         for (const item of data) {
@@ -167,7 +298,6 @@ async function fetchFromLrcCx(title: string, artist: string): Promise<string | n
             const apiArtists = parseArtists(item.artist);
 
             let score = 0;
-
             if (rawLocalTitle === rawApiTitle) score += 50;
             else if (cLocalTitle === cApiTitle) score += 40;
             else if (cLocalTitle && cApiTitle && (cApiTitle.includes(cLocalTitle) || cLocalTitle.includes(cApiTitle))) score += 20;
@@ -193,14 +323,13 @@ async function fetchFromLrcCx(title: string, artist: string): Promise<string | n
             if (score > highestScore) {
                 highestScore = score;
                 if (highestScore >= 60) bestLrc = lrcText;
-                else bestLrc = null;
             }
         }
     }
     return bestLrc;
 }
 
-async function scrapeLyric(title: string, artist: string, filename: string): Promise<string | null> {
+async function scrapeLyricBuiltin(title: string, artist: string, filename: string): Promise<string | null> {
     if (!artist && title) {
         filename = title;
         title = "";
@@ -234,95 +363,109 @@ async function scrapeLyric(title: string, artist: string, filename: string): Pro
                 const data = await res3.json();
                 if (data && data.length > 0) {
                     const synced = data[0].syncedLyrics;
-                    if (synced && synced.length >= 60) {
-                        return synced;
-                    }
+                    if (synced && synced.length >= 60) return synced;
                 }
             } catch(e) {}
         }
     }
+    return null;
+}
 
+// ==========================================
+// 🎼 统一聚合调度入口
+// ==========================================
+async function getAggregatedLyric(title: string, artist: string, filename: string, allowVerbatim = true): Promise<string | null> {
+    artist = cleanArtist(artist);
+    const sources = await getStoredSources();
+
+    for (const src of sources) {
+        if (!src.enabled) continue;
+
+        if (src.id === 'karaoke') {
+            const lrc = await fetchFromKaraokePlugin(title, artist, allowVerbatim);
+            if (lrc) return lrc;
+        } else if (src.id === 'songloft') {
+            const lrc = await fetchFromSongloftLocal(title, artist);
+            if (lrc) return lrc;
+        } else if (src.id === 'builtin') {
+            const lrc = await scrapeLyricBuiltin(title, artist, filename);
+            if (lrc) return lrc;
+        }
+    }
     return null;
 }
 
 // ==========================================
 // 🚀 路由定义
 // ==========================================
-router.get('/api/debug/logs', () => {
-    return jsonResponse(requestLogs);
+router.get('/api/token', async () => {
+    try {
+        const token = await songloft.plugin.getToken();
+        return jsonResponse({ token });
+    } catch (e) {
+        return jsonResponse({ token: "" }, 500);
+    }
 });
 
+// 读取与保存歌词源配置
+router.get('/api/settings', async () => {
+    const sources = await getStoredSources();
+    const karaokeDetected = await checkKaraokePluginAlive();
+    return jsonResponse({ sources, karaokeDetected });
+});
+
+router.post('/api/settings', async (req) => {
+    try {
+        const bodyStr = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+        const data = JSON.parse(bodyStr);
+        if (data && Array.isArray(data.sources)) {
+            await songloft.storage.set('lyric_sources', data.sources);
+            return jsonResponse({ ok: true });
+        }
+    } catch (e) {}
+    return jsonResponse({ ok: false }, 400);
+});
+
+router.get('/api/debug/logs', () => jsonResponse(requestLogs));
 router.delete('/api/debug/logs', () => {
     requestLogs.length = 0;
     return jsonResponse({ msg: "已清空" });
 });
 
-router.get('/api/yinliu/cover', async (req) => {
-    const q = getQueryParams(req);
-    const title = q.title || q.name || "";
-    const artist = q.artist || "";
-    const album = q.album || "";
-
-    const coverUrl = await fetchCover(title, artist, album);
-
-    if (coverUrl) {
-        return {
-            statusCode: 302,
-            headers: { 'Location': coverUrl },
-            body: ''
-        };
-    }
-
-    return { statusCode: 404, headers: {}, body: 'Not Found' };
-});
-
+// 🌟 音流接口：传 allowVerbatim = false，仅返回普通逐行 LRC 歌词
 router.get('/api/yinliu/lyric', async (req) => {
     const q = getQueryParams(req);
     const title = q.title || q.name || "";
     const artist = q.artist || "";
-
     let filename = q.filename || "";
     if (!filename && q.path) {
         const pathParts = String(q.path).split('/');
         filename = pathParts[pathParts.length - 1].replace(/\.[^/.]+$/, "");
     }
 
-    const lrc = await scrapeLyric(title, artist, filename);
+    const lrc = await getAggregatedLyric(title, artist, filename, false);
     return jsonResponse(lrc ? [{ lyrics: lrc }] : []);
 });
 
-router.get('/api/jiantou/cover', async (req) => {
+router.get('/api/yinliu/cover', async (req) => {
     const q = getQueryParams(req);
-    const title = q.title || q.name || "";
-    const artist = q.artist || "";
-    const album = q.album || "";
-
-    const coverUrl = await fetchCover(title, artist, album);
-
-    if (coverUrl) {
-        return {
-            statusCode: 302,
-            headers: { 'Location': coverUrl },
-            body: ''
-        };
-    }
-
+    const coverUrl = await fetchCover(q.title || q.name || "", q.artist || "", q.album || "");
+    if (coverUrl) return { statusCode: 302, headers: { 'Location': coverUrl }, body: '' };
     return { statusCode: 404, headers: {}, body: 'Not Found' };
 });
 
+// 🌟 箭头音乐接口：传 allowVerbatim = true，优先享受逐字歌词动效
 router.get('/api/jiantou/lyric', async (req) => {
     const q = getQueryParams(req);
     const title = q.title || q.name || "";
     const artist = q.artist || "";
-
     let filename = q.filename || "";
     if (!filename && q.path) {
         const pathParts = String(q.path).split('/');
         filename = pathParts[pathParts.length - 1].replace(/\.[^/.]+$/, "");
     }
 
-    const lrc = await scrapeLyric(title, artist, filename);
-
+    const lrc = await getAggregatedLyric(title, artist, filename, true);
     return {
         statusCode: 200,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
@@ -330,22 +473,24 @@ router.get('/api/jiantou/lyric', async (req) => {
     };
 });
 
+router.get('/api/jiantou/cover', async (req) => {
+    const q = getQueryParams(req);
+    const coverUrl = await fetchCover(q.title || q.name || "", q.artist || "", q.album || "");
+    if (coverUrl) return { statusCode: 302, headers: { 'Location': coverUrl }, body: '' };
+    return { statusCode: 404, headers: {}, body: 'Not Found' };
+});
+
 // ==========================================
-// ⏰ 后台定时保活机制（每 1 天自动打卡）
+// ⏰ 后台定时保活机制
 // ==========================================
 function startKeepAlive() {
     if (keepAliveTimer) clearInterval(keepAliveTimer);
-
-    // 设置为每 1 天执行一次 (24小时 = 24 * 60 * 60 * 1000 毫秒)
     keepAliveTimer = setInterval(async () => {
         try {
-            // 1. 获取系统级 Token 触发宿主内部续期
             const token = await songloft.plugin.getToken();
-
-            // 2. 写入一次轻量时间戳，保持存储引擎和 Actor 激活
             if (token) {
                 await songloft.storage.set('last_keep_alive', new Date().toISOString());
-                songloft.log.info('[保活机制] 插件每日定时保活成功，系统 Token 状态正常');
+                songloft.log.info('[保活机制] 每日定时保活成功，系统 Token 状态正常');
             }
         } catch (e) {
             songloft.log.warn('[保活机制] 插件每日定时保活触发异常: ' + e);
@@ -355,15 +500,11 @@ function startKeepAlive() {
 
 async function onInit(): Promise<void> {
     songloft.log.info('lyrics-cover-helper initialized');
-
-    // 🌟 插件初始化时启动每天一次的后台保活
     startKeepAlive();
 }
 
 async function onDeinit(): Promise<void> {
     songloft.log.info('lyrics-cover-helper deinitialized');
-
-    // 🌟 插件卸载/重载时清理计时器
     if (keepAliveTimer) {
         clearInterval(keepAliveTimer);
         keepAliveTimer = null;
@@ -372,7 +513,6 @@ async function onDeinit(): Promise<void> {
 
 async function onHTTPRequest(req: HTTPRequest): Promise<HTTPResponse> {
     let logEntry = null;
-
     if (!req.path.startsWith('/api/debug')) {
         logEntry = logIncomingRequest(req);
     }
@@ -393,7 +533,6 @@ async function onHTTPRequest(req: HTTPRequest): Promise<HTTPResponse> {
             logEntry.responseValue = bodyStr.length > 120 ? bodyStr.substring(0, 120) + "..." : (bodyStr || "无返回值");
         }
     }
-
     return response;
 }
 
